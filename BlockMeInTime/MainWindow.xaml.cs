@@ -14,20 +14,6 @@ using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Collections.ObjectModel;
 
-// BUG: hover/unhover doesn't save properly the original color
-
-/*  NEXT
- * 
- * # create TimeBlock (class) extends TextBlock
- * 
- * 
- * # make TimeBlocks 30 minute intervals (what is the best way to represent this in code?)
- * # somehow link TimeBlocks together -> TimeBlockChain?
- * 
- * # 
- * 
- */
-
 namespace BlockMeInTime
 {
     /// <summary>
