@@ -107,7 +107,7 @@ namespace BlockMeInTime
             return line;
         }
 
-        public static TimeBlock DerializeTimeBlock(string serial)
+        public static TimeBlock DeserializeTimeBlock(string serial)
         {
             string activity_title = "";
             int col;
