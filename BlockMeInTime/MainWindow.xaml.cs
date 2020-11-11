@@ -24,7 +24,7 @@ using System.Collections.ObjectModel;
  * # make TimeBlocks 30 minute intervals (what is the best way to represent this in code?)
  * # somehow link TimeBlocks together -> TimeBlockChain?
  * 
- * # Top-Left corner can be a fade-in/fade-out message box (i.e. GRID[ 0, 0 ])
+ * # 
  * 
  */
 
@@ -53,16 +53,13 @@ namespace BlockMeInTime
         private int hours_per_day = 14;
         private int hour_day_starts_at = 8;
 
-        private static Brush textblock_default_background = Brushes.Black;
-        private static Brush textblock_hover_background = Brushes.DarkGray;
-
         private MouseState mouse_state = MouseState.DEFAULT;
 
-        private TextBlock hovering_over = null;
-        private TextBlock dragging_object = null;
+        private TimeBlock hovering_over = null;
+        private TimeBlock dragging_object = null;
 
-        private List<TextBlock> dragged_selected_items = new List<TextBlock>();
-        private List<TextBlock> timeblocks = new List<TextBlock>();
+        private List<TimeBlock> dragged_selected_items = new List<TimeBlock>();
+        private List<TimeBlock> timeblocks = new List<TimeBlock>();
 
         private static string default_save_file = "save.bmit";
 
@@ -81,7 +78,7 @@ namespace BlockMeInTime
             //LoadFile();
         }
 
-        private string SerializeTimeBlock(TextBlock tb)
+        private string SerializeTimeBlock(TimeBlock tb)
         {
             int col = Grid.GetColumn(tb);
             int row = Grid.GetRow(tb);
@@ -165,39 +162,11 @@ namespace BlockMeInTime
             return new SolidColorBrush(Color.FromArgb(a, r, g, b));
         }
 
-        private TextBlock DeserializeTimeBlock(string serial)
+        private TimeBlock DeserializeTimeBlock(string serial)
         {
-            string activity_title = "";
-            int col;
-            int row;
+            TimeBlock tb = TimeBlock.DeserializeTimeBlock(serial);
 
-            byte r, g, b, a;
-
-            string[] split = serial.Split(':');
-            activity_title = "";
-            a = byte.Parse(split[split.Length - 1]);
-            b = byte.Parse(split[split.Length - 2]);
-            g = byte.Parse(split[split.Length - 3]);
-            r = byte.Parse(split[split.Length - 4]);
-            row = int.Parse(split[split.Length - 5]);
-            col = int.Parse(split[split.Length - 6]);
-            for (int i = 0; i < split.Length - 6; i++)
-            {
-                activity_title += split[i];
-            }
-
-            TextBlock tb;
-
-            tb = maingrid.Children.Cast<TextBlock>().First(e => Grid.GetRow(e) == row && Grid.GetColumn(e) == col);
-            tb.Text = activity_title;
-
-            Color bgcolor = Color.FromArgb(a, r, g, b);
-            SolidColorBrush brush = new SolidColorBrush(bgcolor);
-            tb.Background = brush;
-
-            tb.Foreground = ForegroundBasedOnBackground(bgcolor);
-
-            //PlaceInGrid(tb);
+            PlaceInGrid(tb);
 
             return tb;
         }
@@ -217,7 +186,7 @@ namespace BlockMeInTime
 
                 while ((line = file.ReadLine()) != null)
                 {
-                    TextBlock tb = DeserializeTimeBlock(line);
+                    TimeBlock tb = DeserializeTimeBlock(line);
                     timeblocks.Add(tb);
                 }
             }
@@ -235,7 +204,7 @@ namespace BlockMeInTime
         {
             using (System.IO.StreamWriter file = new System.IO.StreamWriter(@default_save_file))
             {
-                foreach (TextBlock tb in timeblocks)
+                foreach (TimeBlock tb in timeblocks)
                 {
                     string line = SerializeTimeBlock(tb);
                     file.WriteLine(line);
@@ -303,7 +272,7 @@ namespace BlockMeInTime
             {
                 TextBlock tb = new TextBlock();
                 tb.Text = DaysOfWeek[x - 1];
-                tb.Background = textblock_default_background;
+                tb.Background = TimeBlock_default_background;
                 Grid.SetColumn(tb, x);
                 Grid.SetRow(tb, y);
                 maingrid.Children.Add(tb);
@@ -313,7 +282,7 @@ namespace BlockMeInTime
             {
                 TextBlock tb = new TextBlock();
                 tb.Text = (hour_day_starts_at + y - 1).ToString() + " o'clock";
-                tb.Background = textblock_default_background;
+                tb.Background = TimeBlock_default_background;
                 tb.Margin = new Thickness(5, 0, 0, 0);
                 Grid.SetColumn(tb, x);
                 Grid.SetRow(tb, y);
@@ -324,14 +293,12 @@ namespace BlockMeInTime
             {
                 for(int y = 1; y < hours_per_day + 1; y++)
                 {
-                    TextBlock nb = new TextBlock();
-                    nb.Text = "--";
-                    Grid.SetColumn(nb, x);
-                    Grid.SetRow(nb, y);
-                    maingrid.Children.Add(nb);
-                    nb.Background = textblock_default_background;
-                    nb.MouseEnter += TextBlock_MouseEnter;
-                    nb.MouseLeave += TextBlock_MouseLeave;
+                    TimeBlock tb = new TimeBlock(x, y);
+                    tb.Text = "--";
+                    PlaceInGrid(tb);
+                    tb.Background = TimeBlock_default_background;
+                    tb.MouseEnter += TimeBlock_MouseEnter;
+                    tb.MouseLeave += TimeBlock_MouseLeave;
                 }
             }
 
@@ -351,14 +318,14 @@ namespace BlockMeInTime
             }
         }
 
-        private void SetDefaultColor(TextBlock tb)
+        private void SetDefaultColor(TimeBlock tb)
         {
-            tb.Background = textblock_default_background;
+            tb.Background = TimeBlock_default_background;
         }
 
-        private void SetHoverColor(TextBlock tb)
+        private void SetHoverColor(TimeBlock tb)
         {
-            tb.Background = textblock_hover_background;
+            tb.Background = TimeBlock_hover_background;
         }
 
         private void ClearDragging()
@@ -396,11 +363,11 @@ namespace BlockMeInTime
 
             if (block_details_question.cancel)
             {
-                foreach (TextBlock tb in dragged_selected_items)
+                foreach (TimeBlock tb in dragged_selected_items)
                 {
                     if (tb != hovering_over)
                     {
-                        tb.Background = textblock_default_background;
+                        tb.Background = TimeBlock_default_background;
                         tb.Foreground = ForegroundBasedOnBackground(tb.Background);
                     }
                 }
@@ -410,7 +377,7 @@ namespace BlockMeInTime
 
             string activity_title = block_details_question.inputField.Text;
 
-            foreach (TextBlock tb in dragged_selected_items)
+            foreach (TimeBlock tb in dragged_selected_items)
             {
                 if (tb != hovering_over)
                 {
@@ -439,27 +406,27 @@ namespace BlockMeInTime
             mouse_state = MouseState.DEFAULT;
         }
 
-        private void TextBlock_MouseEnter(object sender, MouseEventArgs e)
+        private void TimeBlock_MouseEnter(object sender, MouseEventArgs e)
         {
-            var textblock = sender as TextBlock;
+            var TimeBlock = sender as TimeBlock;
 
-            textblock.Background = HoverColor(textblock.Background);
+            TimeBlock.Background = HoverColor(TimeBlock.Background);
 
-            hovering_over = textblock;
+            hovering_over = TimeBlock;
 
             if (mouse_state == MouseState.DRAGGING_SELECTION)
             {
-                dragged_selected_items.Add(textblock);
+                dragged_selected_items.Add(TimeBlock);
             }
         }
 
-        private void TextBlock_MouseLeave(object sender, MouseEventArgs e)
+        private void TimeBlock_MouseLeave(object sender, MouseEventArgs e)
         {
             if (mouse_state != MouseState.DRAGGING_SELECTION)
             {
-                var textblock = sender as TextBlock;
+                var TimeBlock = sender as TimeBlock;
 
-                textblock.Background = UnHoverColor(textblock.Background);
+                TimeBlock.Background = UnHoverColor(TimeBlock.Background);
             }
 
             hovering_over = null;
