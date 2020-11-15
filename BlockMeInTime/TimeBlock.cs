@@ -137,6 +137,10 @@ namespace BlockMeInTime
             MouseLeave += HoverAway;
         }
 
+
+        /*
+         * Base on: https://stackoverflow.com/questions/11867545/change-text-color-based-on-brightness-of-the-covered-background-area
+         */
         private void ForegroundBasedOnBackground()
         {
             //Color color = ((SolidColorBrush)data._original_background).Color;

@@ -31,9 +31,6 @@ namespace BlockMeInTime
         private DayLengthQuestion day_length_question_window;
         private BlockDetailsQuestion block_details_question;
 
-        private Brush default_textblock_color = Brushes.Black;
-        private Brush hover_textblock_color = Brushes.DarkGray;
-
         private Grid maingrid;
 
         private int hours_per_day = 14;
@@ -74,14 +71,6 @@ namespace BlockMeInTime
                 //LoadFile(default_save_file);
                 //SaveFile();
             }
-        }
-
-        /*
-         * Base on: https://stackoverflow.com/questions/11867545/change-text-color-based-on-brightness-of-the-covered-background-area
-         */
-        private SolidColorBrush ForegroundBasedOnBackground(SolidColorBrush background)
-        {
-            return ForegroundBasedOnBackground((background).Color);
         }
 
         private SolidColorBrush ForegroundBasedOnBackground(Color background)
@@ -165,7 +154,6 @@ namespace BlockMeInTime
             {
                 foreach (TimeBlock tb in timeblocks)
                 {
-                    //string line = tb.Serialize();
                     string line = tb.Serialize();
                     file.WriteLine(line);
                 }
@@ -232,7 +220,7 @@ namespace BlockMeInTime
             {
                 TextBlock tb = new TextBlock();
                 tb.Text = DaysOfWeek[x - 1];
-                tb.Background = default_textblock_color;
+                tb.Background = TimeBlock.textblock_default_background;
                 Grid.SetColumn(tb, x);
                 Grid.SetRow(tb, y);
                 maingrid.Children.Add(tb);
@@ -242,7 +230,7 @@ namespace BlockMeInTime
             {
                 TextBlock tb = new TextBlock();
                 tb.Text = (hour_day_starts_at + y - 1).ToString() + " o'clock";
-                tb.Background = default_textblock_color;
+                tb.Background = TimeBlock.textblock_default_background;
                 tb.Margin = new Thickness(5, 0, 0, 0);
                 Grid.SetColumn(tb, x);
                 Grid.SetRow(tb, y);
@@ -394,7 +382,6 @@ namespace BlockMeInTime
                 {
                     for (int y = from_y; y < (to_y + 1); y++)
                     {
-                        //TimeBlock tb = maingrid.Children.Cast<TimeBlock>().First(el => Grid.GetRow(el) == from_x && Grid.GetColumn(el) == from_y);
                         TimeBlock tb = tb_array[x-1][y-1];
                         tb.HoverOver();
                         dragged_selected_items.Add(tb);
