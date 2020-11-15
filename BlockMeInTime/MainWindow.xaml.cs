@@ -13,6 +13,9 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Collections.ObjectModel;
+using System.IO.Packaging;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace BlockMeInTime
 {
@@ -21,12 +24,6 @@ namespace BlockMeInTime
     /// </summary>
     /// 
 
-    enum MouseState
-    {
-        DEFAULT,
-        DRAGGING_SELECTION,
-    }
-
     public partial class MainWindow : Window
     {
         public static ReadOnlyCollection<string> DaysOfWeek { get; } = new ReadOnlyCollection<string>(new string[] { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" });
@@ -34,12 +31,13 @@ namespace BlockMeInTime
         private DayLengthQuestion day_length_question_window;
         private BlockDetailsQuestion block_details_question;
 
+        private Brush default_textblock_color = Brushes.Black;
+        private Brush hover_textblock_color = Brushes.DarkGray;
+
         private Grid maingrid;
 
         private int hours_per_day = 14;
         private int hour_day_starts_at = 8;
-
-        private MouseState mouse_state = MouseState.DEFAULT;
 
         private TimeBlock hovering_over = null;
         private TimeBlock dragging_object = null;
@@ -48,6 +46,7 @@ namespace BlockMeInTime
         private List<TimeBlock> timeblocks = new List<TimeBlock>();
 
         private static string default_save_file = "save.bmit";
+        private static string default_backup_file = "save.bmit.bck";
 
         public byte hover_factor = 30;
 
@@ -61,7 +60,16 @@ namespace BlockMeInTime
 
             GenerateTimeBlocks();
 
-            //LoadFile();
+            if(System.IO.File.Exists(default_save_file))
+            {
+                if (new System.IO.FileInfo(default_save_file).Length == 0 && System.IO.File.Exists(default_backup_file))
+                {
+                    CopyBackup();
+                }
+
+                //LoadFile(default_save_file);
+                //SaveFile();
+            }
         }
 
         private string SerializeTimeBlock(TimeBlock tb)
@@ -69,20 +77,8 @@ namespace BlockMeInTime
             int col = Grid.GetColumn(tb);
             int row = Grid.GetRow(tb);
 
-            if(tb == hovering_over)
-            {
-                tb.Background = UnHoverColor(tb.Background);
-                tb.Foreground = ForegroundBasedOnBackground(tb.Background);
-            }
-
-            Color color = ((SolidColorBrush)tb.Background).Color;
-            string line = String.Format("{0}:{1}:{2}:{3}:{4}:{5}:{6}", tb.Text, col, row, color.R, color.G, color.B, color.A);
-
-            if (tb == hovering_over)
-            {
-                tb.Background = HoverColor(tb.Background);
-                tb.Foreground = ForegroundBasedOnBackground(tb.Background);
-            }
+            Color color = ((SolidColorBrush)tb.OriginalBackground).Color;
+            string line = String.Format("{0}:{1}:{2}:{3}:{4}:{5}:{6}", tb.Message, col, row, color.R, color.G, color.B, color.A);
 
             return line;
         }
@@ -90,12 +86,12 @@ namespace BlockMeInTime
         /*
          * Base on: https://stackoverflow.com/questions/11867545/change-text-color-based-on-brightness-of-the-covered-background-area
          */
-        private Brush ForegroundBasedOnBackground(Brush background)
+        private SolidColorBrush ForegroundBasedOnBackground(SolidColorBrush background)
         {
-            return ForegroundBasedOnBackground(((SolidColorBrush)background).Color);
+            return ForegroundBasedOnBackground((background).Color);
         }
 
-        private Brush ForegroundBasedOnBackground(Color background)
+        private SolidColorBrush ForegroundBasedOnBackground(Color background)
         {
             int r = background.R;
             int g = background.G;
@@ -103,54 +99,14 @@ namespace BlockMeInTime
 
             float brightness = (((((float)r) * 299f) + (((float)g) * 587f) + (((float)b) * 114f)) / 1000f);
 
-            Brush foregroundBrush = (brightness > 125f) ? Brushes.Black : Brushes.White;
+            SolidColorBrush foregroundBrush = (brightness > 125f) ? Brushes.Black : Brushes.White;
 
             return foregroundBrush;
         }
 
-        private Brush HoverColor(Brush brush)
-        {
-            return HoverColor(((SolidColorBrush)brush).Color);
-        }
-
-        private Brush HoverColor(Color color)
-        {
-            byte a, r, g, b;
-            a = color.A;
-            r = color.R;
-            g = color.G;
-            b = color.B;
-
-            r += hover_factor;
-            g += hover_factor;
-            b += hover_factor;
-
-            return new SolidColorBrush(Color.FromArgb(a, r, g, b));
-        }
-
-        private Brush UnHoverColor(Brush brush)
-        {
-            return UnHoverColor(((SolidColorBrush)brush).Color);
-        }
-
-        private Brush UnHoverColor(Color color)
-        {
-            byte a, r, g, b;
-            a = color.A;
-            r = color.R;
-            g = color.G;
-            b = color.B;
-
-            r -= hover_factor;
-            g -= hover_factor;
-            b -= hover_factor;
-
-            return new SolidColorBrush(Color.FromArgb(a, r, g, b));
-        }
-
         private TimeBlock DeserializeTimeBlock(string serial)
         {
-            TimeBlock tb = TimeBlock.DeserializeTimeBlock(serial);
+            TimeBlock tb = TimeBlock.Deserialize(serial);
 
             PlaceInGrid(tb);
 
@@ -164,9 +120,9 @@ namespace BlockMeInTime
             maingrid.Children.Add(tb);
         }
 
-        private void LoadFile()
+        private void LoadFile(string filename)
         {
-            using (System.IO.StreamReader file = new System.IO.StreamReader(@default_save_file))
+            using (System.IO.StreamReader file = new System.IO.StreamReader(filename))
             {
                 string line;
 
@@ -174,6 +130,8 @@ namespace BlockMeInTime
                 {
                     TimeBlock tb = DeserializeTimeBlock(line);
                     timeblocks.Add(tb);
+                    tb.MouseEnter += TimeBlock_MouseEnter;
+                    tb.MouseLeave += TimeBlock_MouseLeave;
                 }
             }
 
@@ -183,21 +141,44 @@ namespace BlockMeInTime
             MessageBoxButton button = MessageBoxButton.OK;
             MessageBoxImage icon = MessageBoxImage.Information;
 
-            MessageBox.Show(messageBoxText, caption, button, icon);
+            //MessageBox.Show(messageBoxText, caption, button, icon);
+        }
+
+        private void CopyBackup()
+        {
+            if (System.IO.File.Exists(default_backup_file))
+            {
+                System.IO.File.Delete(default_save_file);
+            }
+
+            System.IO.File.Copy(default_backup_file, default_save_file);
+        }
+
+        private void BackupFile()
+        {
+            if(System.IO.File.Exists(default_backup_file))
+            {
+                System.IO.File.Delete(default_backup_file);
+            }
+
+            System.IO.File.Copy(default_save_file, default_backup_file);
         }
 
         private void SaveFile()
         {
+            BackupFile();
+
             using (System.IO.StreamWriter file = new System.IO.StreamWriter(@default_save_file))
             {
                 foreach (TimeBlock tb in timeblocks)
                 {
-                    string line = SerializeTimeBlock(tb);
+                    //string line = tb.Serialize();
+                    string line = tb.Serialize();
                     file.WriteLine(line);
                 }
             }
 
-            ShowSaveSuccessMessage();
+            //ShowSaveSuccessMessage();
         }
 
         private void ShowSaveSuccessMessage()
@@ -228,7 +209,7 @@ namespace BlockMeInTime
             return new SolidColorBrush(Color.FromRgb((byte)r.Next(min, max), (byte)r.Next(min, max), (byte)r.Next(min, max)));
         }
 
-        private Brush GetValidBackgroundColor()
+        private SolidColorBrush GetValidBackgroundColor()
         {
             Random r = new Random();
             int min = 50;
@@ -258,7 +239,7 @@ namespace BlockMeInTime
             {
                 TextBlock tb = new TextBlock();
                 tb.Text = DaysOfWeek[x - 1];
-                tb.Background = TimeBlock_default_background;
+                tb.Background = default_textblock_color;
                 Grid.SetColumn(tb, x);
                 Grid.SetRow(tb, y);
                 maingrid.Children.Add(tb);
@@ -268,7 +249,7 @@ namespace BlockMeInTime
             {
                 TextBlock tb = new TextBlock();
                 tb.Text = (hour_day_starts_at + y - 1).ToString() + " o'clock";
-                tb.Background = TimeBlock_default_background;
+                tb.Background = default_textblock_color;
                 tb.Margin = new Thickness(5, 0, 0, 0);
                 Grid.SetColumn(tb, x);
                 Grid.SetRow(tb, y);
@@ -280,9 +261,8 @@ namespace BlockMeInTime
                 for(int y = 1; y < hours_per_day + 1; y++)
                 {
                     TimeBlock tb = new TimeBlock(x, y);
-                    tb.Text = "--";
+                    tb.Message = "--";
                     PlaceInGrid(tb);
-                    tb.Background = TimeBlock_default_background;
                     tb.MouseEnter += TimeBlock_MouseEnter;
                     tb.MouseLeave += TimeBlock_MouseLeave;
                 }
@@ -300,18 +280,8 @@ namespace BlockMeInTime
 
             if (e.Key == Key.L && Keyboard.Modifiers == ModifierKeys.Control)
             {
-                LoadFile();
+                LoadFile(default_save_file);
             }
-        }
-
-        private void SetDefaultColor(TimeBlock tb)
-        {
-            tb.Background = TimeBlock_default_background;
-        }
-
-        private void SetHoverColor(TimeBlock tb)
-        {
-            tb.Background = TimeBlock_hover_background;
         }
 
         private void ClearDragging()
@@ -320,7 +290,7 @@ namespace BlockMeInTime
             {
                 if(tb != hovering_over && !timeblocks.Contains(tb))
                 {
-                    SetDefaultColor(tb);
+                    tb.ResetToOriginalBackground();
                 }
             }
 
@@ -331,7 +301,7 @@ namespace BlockMeInTime
         {
             if(hovering_over != null)
             {
-                mouse_state = MouseState.DRAGGING_SELECTION;
+                UserInputState.GetUserInputState().state = UserInputStateEnum.DRAGGING_SELECTION;
                 dragging_object = hovering_over;
                 dragged_selected_items.Add(dragging_object);
             }
@@ -353,8 +323,7 @@ namespace BlockMeInTime
                 {
                     if (tb != hovering_over)
                     {
-                        tb.Background = TimeBlock_default_background;
-                        tb.Foreground = ForegroundBasedOnBackground(tb.Background);
+                        tb.OriginalBackground = TimeBlock.textblock_default_background;
                     }
                 }
                 dragged_selected_items.Clear();
@@ -367,9 +336,8 @@ namespace BlockMeInTime
             {
                 if (tb != hovering_over)
                 {
-                    tb.Text = activity_title;
-                    tb.Background = GetValidBackgroundColor();
-                    tb.Foreground = ForegroundBasedOnBackground(tb.Background);
+                    tb.Message = activity_title;
+                    tb.OriginalBackground = GetValidBackgroundColor();
                 }
             }
         }
@@ -389,18 +357,16 @@ namespace BlockMeInTime
 
             ClearDragging();
 
-            mouse_state = MouseState.DEFAULT;
+            UserInputState.GetUserInputState().state = UserInputStateEnum.DEFAULT;
         }
 
         private void TimeBlock_MouseEnter(object sender, MouseEventArgs e)
         {
             var TimeBlock = sender as TimeBlock;
 
-            TimeBlock.Background = HoverColor(TimeBlock.Background);
-
             hovering_over = TimeBlock;
 
-            if (mouse_state == MouseState.DRAGGING_SELECTION)
+            if (UserInputState.GetUserInputState().state == UserInputStateEnum.DRAGGING_SELECTION)
             {
                 dragged_selected_items.Add(TimeBlock);
             }
@@ -408,11 +374,9 @@ namespace BlockMeInTime
 
         private void TimeBlock_MouseLeave(object sender, MouseEventArgs e)
         {
-            if (mouse_state != MouseState.DRAGGING_SELECTION)
+            if (UserInputState.GetUserInputState().state != UserInputStateEnum.DRAGGING_SELECTION)
             {
-                var TimeBlock = sender as TimeBlock;
-
-                TimeBlock.Background = UnHoverColor(TimeBlock.Background);
+                var timeblock = sender as TimeBlock;
             }
 
             hovering_over = null;

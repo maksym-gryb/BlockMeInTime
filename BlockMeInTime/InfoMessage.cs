@@ -46,6 +46,7 @@ namespace BlockMeInTime
 
             if (alpha < 20) -> base.Hide(); && fadingDispatcherTimer.Stop();
         }
+
         */
     }
 }

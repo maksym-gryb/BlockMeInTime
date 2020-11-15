@@ -3,72 +3,100 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows.Input;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace BlockMeInTime
 {
     // TODO: Move all TimeBlock related logic here
-    class TimeBlock : TextBlock
+    class TimeBlockData
     {
-        public const int minimum_block_size = 50;// pixels per time block
+        public int id;
 
-        private static Brush textblock_default_background = Brushes.Black;
-        private static Brush textblock_hover_background = Brushes.DarkGray;
-
+        /*
         public int from_minutes;
         public int to_minutes;
 
         public int day_of_week;
+        */
+        public string text { get; set; }
+        public Color _original_background_color { get; set; }
+        public int col { get; set; }
+        public int row { get; set; }
+    }
 
-        public String message;
+    class TimeBlock : TextBlock
+    {
+        public TimeBlockData data = new TimeBlockData();
 
-        private Brush _original_background;
-
-        /*
-        public Brush Background
+        public TimeBlockData Data
         {
             get
             {
-                return Background;
+                return data;
             }
 
             set
             {
-                Background = value;
-                ForegroundBasedOnBackground();
+                data = value;
+                Message = data.text;
+                OriginalBackground = new SolidColorBrush(data._original_background_color);
             }
         }
-        */
 
-        private int col;
+        public static int next_id = 0;
+
+        public static byte hover_factor = 30;
+
+        public static SolidColorBrush textblock_default_background = Brushes.Black;
+        public static SolidColorBrush textblock_hover_background = Brushes.DarkGray;
+
+        public SolidColorBrush _original_background { get; set; }
+
         public int Col
         {
             get
             {
-                return col;
+                return data.col;
+            }
+
+            set
+            {
+                data.col = value;
             }
         }
-        private int row;
+
         public int Row
         {
             get
             {
-                return row;
+                return data.row;
+            }
+
+            set
+            {
+                data.row = value;
             }
         }
 
-        public static byte hover_factor = 30;
-        public TimeBlock(int _col, int _row) : base()
+        public string Message
         {
-            col = _col;
-            row = _row;
+            get
+            {
+                return data.text;
+            }
 
-            _original_background = textblock_default_background;
-            Background = textblock_default_background;
+            set
+            {
+                data.text = value;
+                Text = value;
+            }
         }
 
-        public Brush OriginalBackground
+        public SolidColorBrush OriginalBackground
         {
             get
             {
@@ -78,12 +106,41 @@ namespace BlockMeInTime
             set
             {
                 _original_background = value;
+                Background = value;
+                ForegroundBasedOnBackground();
+
+                data._original_background_color = _original_background.Color;
             }
+        }
+
+        public TimeBlock(int _col, int _row) : base()
+        {
+            data.id = TimeBlock.next_id++;
+
+            Col = _col;
+            Row = _row;
+
+            OriginalBackground = TimeBlock.textblock_default_background;
+
+            MouseEnter += HoverOver;
+            MouseLeave += HoverAway;
+        }
+
+        public TimeBlock(TimeBlockData _data) : base()
+        {
+            _data.id = TimeBlock.next_id++;
+
+
+            Data = _data;
+
+            MouseEnter += HoverOver;
+            MouseLeave += HoverAway;
         }
 
         private void ForegroundBasedOnBackground()
         {
-            Color color = ((SolidColorBrush)_original_background).Color;
+            //Color color = ((SolidColorBrush)data._original_background).Color;
+            Color color = ((SolidColorBrush)OriginalBackground).Color;
 
             int r = color.R;
             int g = color.G;
@@ -96,48 +153,28 @@ namespace BlockMeInTime
             Foreground = foregroundBrush;
         }
 
-        private string SerializeTimeBlock()
+        public string Serialize()
         {
-            int col = Grid.GetColumn(this);
-            int row = Grid.GetRow(this);
+            Col = Grid.GetColumn(this);
+            Row = Grid.GetRow(this);
 
-            Color color = ((SolidColorBrush)_original_background).Color;
-            string line = String.Format("{0}:{1}:{2}:{3}:{4}:{5}:{6}", Text, col, row, color.R, color.G, color.B, color.A);
+            string line = JsonSerializer.Serialize(Data);
 
             return line;
         }
 
-        public static TimeBlock DeserializeTimeBlock(string serial)
+        public static TimeBlock Deserialize(string serial)
         {
-            string activity_title = "";
-            int col;
-            int row;
+            TimeBlockData _data = JsonSerializer.Deserialize<TimeBlockData>(serial);
 
-            byte r, g, b, a;
-
-            string[] split = serial.Split(':');
-            activity_title = "";
-            a = byte.Parse(split[split.Length - 1]);
-            b = byte.Parse(split[split.Length - 2]);
-            g = byte.Parse(split[split.Length - 3]);
-            r = byte.Parse(split[split.Length - 4]);
-            row = int.Parse(split[split.Length - 5]);
-            col = int.Parse(split[split.Length - 6]);
-            for (int i = 0; i < split.Length - 6; i++)
-            {
-                activity_title += split[i];
-            }
-
-            TimeBlock tb = new TimeBlock(col, row);
-
-            tb.Text = activity_title;
-
-            Color bgcolor = Color.FromArgb(a, r, g, b);
-            SolidColorBrush brush = new SolidColorBrush(bgcolor);
-            tb.Background = brush;
-            tb.ForegroundBasedOnBackground();
+            TimeBlock tb = new TimeBlock(_data);
 
             return tb;
+        }
+
+        public void HoverOver(object sender, MouseEventArgs e)
+        {
+            HoverOver();
         }
 
         public void HoverOver()
@@ -145,9 +182,23 @@ namespace BlockMeInTime
             HoverColor();
         }
 
-        public void HocerAway()
+        public void HoverAway(object sender, MouseEventArgs e)
         {
-            UnHoverColor();
+            HoverAway();
+        }
+
+        public void HoverAway()
+        {
+            if(UserInputState.GetUserInputState().state != UserInputStateEnum.DRAGGING_SELECTION)
+            {
+                UnHoverColor();
+            }
+        }
+
+        public void ResetToOriginalBackground()
+        {
+            Background = OriginalBackground;
+            ForegroundBasedOnBackground();
         }
 
         private void HoverColor()
@@ -170,8 +221,7 @@ namespace BlockMeInTime
 
         private void UnHoverColor()
         {
-            Background = _original_background;
-            ForegroundBasedOnBackground();
+            ResetToOriginalBackground();
         }
     }
 }

@@ -35,6 +35,7 @@ namespace BlockMeInTime
             }
             if(ke.Key == Key.Escape)
             {
+                cancel = true;
                 Close();
             }
         }
