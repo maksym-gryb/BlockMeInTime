@@ -45,6 +45,8 @@ namespace BlockMeInTime
         private List<TimeBlock> dragged_selected_items = new List<TimeBlock>();
         private List<TimeBlock> timeblocks = new List<TimeBlock>();
 
+        private TimeBlock[][] tb_array;
+
         private static string default_save_file = "save.bmit";
         private static string default_backup_file = "save.bmit.bck";
 
@@ -57,6 +59,8 @@ namespace BlockMeInTime
 
             //AskDayLength();
             //AskDayStartHour();
+
+            tb_array = new TimeBlock[hours_per_day][];
 
             GenerateTimeBlocks();
 
@@ -258,6 +262,8 @@ namespace BlockMeInTime
 
             for (int x = 1; x < days_in_week + 1; x++)
             {
+                tb_array[x - 1] = new TimeBlock[hours_per_day];
+
                 for(int y = 1; y < hours_per_day + 1; y++)
                 {
                     TimeBlock tb = new TimeBlock(x, y);
@@ -265,6 +271,8 @@ namespace BlockMeInTime
                     PlaceInGrid(tb);
                     tb.MouseEnter += TimeBlock_MouseEnter;
                     tb.MouseLeave += TimeBlock_MouseLeave;
+
+                    tb_array[x - 1][y - 1] = tb;
                 }
             }
 
@@ -286,9 +294,9 @@ namespace BlockMeInTime
 
         private void ClearDragging()
         {
-            foreach(TimeBlock tb in dragged_selected_items)
+            foreach (TimeBlock tb in dragged_selected_items)
             {
-                if(tb != hovering_over && !timeblocks.Contains(tb))
+                if (tb != hovering_over)
                 {
                     tb.ResetToOriginalBackground();
                 }
@@ -362,13 +370,47 @@ namespace BlockMeInTime
 
         private void TimeBlock_MouseEnter(object sender, MouseEventArgs e)
         {
-            var TimeBlock = sender as TimeBlock;
+            var timeblock = sender as TimeBlock;
 
-            hovering_over = TimeBlock;
+            hovering_over = timeblock;
 
             if (UserInputState.GetUserInputState().state == UserInputStateEnum.DRAGGING_SELECTION)
             {
-                dragged_selected_items.Add(TimeBlock);
+                hovering_over.ResetToOriginalBackground();
+                ClearDragging();
+                int from_x, to_x, from_y, to_y;
+                if(dragging_object.Col > hovering_over.Col)
+                {
+                    from_x = hovering_over.Col;
+                    to_x = dragging_object.Col;
+                }
+                else
+                {
+                    from_x = dragging_object.Col;
+                    to_x = hovering_over.Col;
+                }
+
+                if(dragging_object.Row > hovering_over.Row)
+                {
+                    from_y = hovering_over.Row;
+                    to_y = dragging_object.Row;
+                }
+                else
+                {
+                    from_y = dragging_object.Row;
+                    to_y = hovering_over.Row;
+                }
+
+                for (int x = from_x; x < (to_x + 1); x++)
+                {
+                    for (int y = from_y; y < (to_y + 1); y++)
+                    {
+                        //TimeBlock tb = maingrid.Children.Cast<TimeBlock>().First(el => Grid.GetRow(el) == from_x && Grid.GetColumn(el) == from_y);
+                        TimeBlock tb = tb_array[x-1][y-1];
+                        tb.HoverOver();
+                        dragged_selected_items.Add(tb);
+                    }
+                }
             }
         }
 
@@ -376,7 +418,7 @@ namespace BlockMeInTime
         {
             if (UserInputState.GetUserInputState().state != UserInputStateEnum.DRAGGING_SELECTION)
             {
-                var timeblock = sender as TimeBlock;
+                //var timeblock = sender as TimeBlock;
             }
 
             hovering_over = null;
