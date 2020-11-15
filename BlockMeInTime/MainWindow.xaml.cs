@@ -76,17 +76,6 @@ namespace BlockMeInTime
             }
         }
 
-        private string SerializeTimeBlock(TimeBlock tb)
-        {
-            int col = Grid.GetColumn(tb);
-            int row = Grid.GetRow(tb);
-
-            Color color = ((SolidColorBrush)tb.OriginalBackground).Color;
-            string line = String.Format("{0}:{1}:{2}:{3}:{4}:{5}:{6}", tb.Message, col, row, color.R, color.G, color.B, color.A);
-
-            return line;
-        }
-
         /*
          * Base on: https://stackoverflow.com/questions/11867545/change-text-color-based-on-brightness-of-the-covered-background-area
          */
