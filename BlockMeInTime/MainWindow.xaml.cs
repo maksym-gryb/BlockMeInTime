@@ -49,6 +49,8 @@ namespace BlockMeInTime
 
         public byte hover_factor = 30;
 
+        private InfoMessage info_message = new InfoMessage();
+
         public MainWindow()
         {
             InitializeComponent();
@@ -118,12 +120,13 @@ namespace BlockMeInTime
             }
 
             // show information message
-            string messageBoxText = "Load file complete";
+            string messageBoxText = "Load complete";
             string caption = "Load File";
             MessageBoxButton button = MessageBoxButton.OK;
             MessageBoxImage icon = MessageBoxImage.Information;
 
             //MessageBox.Show(messageBoxText, caption, button, icon);
+            info_message.Show(1, 2, messageBoxText);
         }
 
         private void CopyBackup()
@@ -203,14 +206,20 @@ namespace BlockMeInTime
             maingrid = new Grid();
             maingrid.ShowGridLines = false;
 
-            int days_in_week = 5;
+            // add info message
+            Grid.SetColumn(info_message, 0);
+            Grid.SetRow(info_message, 0);
+            maingrid.Children.Add(info_message);
 
+            // display days of week on top
+            int days_in_week = 5;
             for(int i = days_in_week; i + 1 > 0; i--)
             {
                 ColumnDefinition new_column_definition = new ColumnDefinition();
                 maingrid.ColumnDefinitions.Add(new_column_definition);
             }
 
+            // create hourly rows
             for(int i = hours_per_day; i + 1 > 0; i--)
             {
                 maingrid.RowDefinitions.Add(new RowDefinition());
@@ -226,6 +235,7 @@ namespace BlockMeInTime
                 maingrid.Children.Add(tb);
             }
 
+            // display times
             for (int y = 1, x = 0; y < hours_per_day + 1; y++)
             {
                 TextBlock tb = new TextBlock();
@@ -237,6 +247,7 @@ namespace BlockMeInTime
                 maingrid.Children.Add(tb);
             }
 
+            // generate Time Blocks
             for (int x = 1; x < days_in_week + 1; x++)
             {
                 tb_array[x - 1] = new TimeBlock[hours_per_day];
